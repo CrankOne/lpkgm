@@ -3,3 +3,4 @@
 venv/*
 lpkgm.egg-info/*
 sft/*
+lpkgm/__pycache__/*
