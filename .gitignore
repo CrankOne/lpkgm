@@ -1,0 +1,5 @@
+*.swp
+*.swo
+venv/*
+lpkgm.egg-info/*
+sft/*
