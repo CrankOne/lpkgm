@@ -38,9 +38,11 @@ d = {
         'author_email' : 'renat.dusaev@cern.ch',
         'packages' : ['lpkgm'],
         'install_requires' : get_requirements( 'requirements.txt' ),
-        'console_scripts': [
-            'lpkgm = lpkgm.lpkgm:main',
-        ]
+        'entry_points' : {
+            'console_scripts': [
+                'lpkgm=lpkgm.lpkgm:main',
+            ]
+        },
     }
 
 setuptools.setup(**d)
