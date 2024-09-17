@@ -1,3 +1,8 @@
+import os, logging, pickle
+
+from lpkgm.utils import packages
+from lpkgm.settings import gSettings
+
 # networkx warning workaround (need only for Python 3.9)
 import warnings
 with warnings.catch_warnings():
@@ -100,8 +105,17 @@ class PkgGraph(object):
         self.g.remove_node((pkgName, pkgVer))
         self._dirty = True
 
+    def add_pkg(self, pkgName, pkgVer):
+        self.g.add_node((pkgName, pkgVer))
+        self._dirty = True
+
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
-        if self._dirty: self.save()
+        L = logging.getLogger(__name__)
+        if self._dirty:
+            self.save()
+        else:
+            L.debug('Dep.graph did not change.')
+

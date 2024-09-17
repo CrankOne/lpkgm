@@ -3,9 +3,9 @@ About LPKGM
 
 LPKGM is "local (or lightweight) package manager". It provides some extent of
 automatization to deploy software builds for HPC environment (mostly on file
-shares). Comparing to `spack <https://spack.io/>`_ this script is much more
-lightweight, straightforward (and rudimantary, the LPKGM's itself is
-about two thousands lines of code).
+shares). Comparing to `spack <https://spack.io/>`_ this package is much more
+lightweight, straightforward (and, one has to admit, is deliberately made
+rather rudimantary).
 
 Its primary purpose is to fetch and deploy packages produced by CI/CD
 pipelines, keep track of continiously updated versions, facilitate fast and
@@ -20,6 +20,46 @@ here it is done on purpose):
   logic.
 - for packages not provided by CI/CD it just forwards execution to shell
   scripts most of the time).
+
+What it does:
+
+- deliver and deploy CI/CD packages from GitHub, Gitlab, etc.
+- relying on user-provided shell-scripts, build from sources and then deploy
+  some packages in the userspace/custom location (by prefix installation).
+- track on the installed versions and files, foreseeing some degree of
+  runtime control by means
+  of `Linux Environment Modules <https://modules.readthedocs.io/en/latest/modulefile.html>`
+  and thus providing abilities to work with different versions and bundles of
+  package versions
+- maintain dependency tree composed of multiple package versions within
+  filesystem subtree.
+- track changes of large amount of static files brought by some packages,
+  providing de-duplication by means of soft and hard links.
+
+What it does not (or not well-suited for):
+
+- Cross-platform builds
+- Binary-deterministic builds in isolated environments
+  (for this kind of tool, see `Bob <https://bobbuildtool.dev/>`)
+- Does not maintain entire Linux distribution (LFS)
+- Management of thousands of installed packages should be tedious due to
+  absence of database.
+
+General idea is to leverage management of some software ecosystem installed on
+top of certain Linux distribution -- locally, or within HTC/HPC software
+shares.
+
+Example Scenario
+================
+
+Having few packages on different repositories a team would like to maintain
+CI/CD pipeline which will:
+
+- handle certain commits (in branch or tagged)
+- build, test and deploy packages linked 
+
+Reference document structure
+============================
 
 One might be interested in one of the follwoing use cases within this
 document:

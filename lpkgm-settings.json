@@ -1,6 +1,6 @@
 {
     "definitions": {
-        "lpkgm-prefix": "./sft/",
+        "lpkgm-prefix": "{pwd}/sft/",
         "pkg-scripts": "./pkg-scripts/"
     },
     "gitlab-tokens-dir": "$HOME/.gitlab-ci-tokens/",
@@ -8,48 +8,7 @@
     "tmp-dir-prefix": null,
     "modulepath": "{lpkgm-prefix}/modulefiles",
 
-    "packages": {
-        "tcl" : {
-            "version-regex": [
-                    "^(?P<major>[0-9]+)\\.(?P<minor>[0-9]+)\\.(?P<patch>[0-9]+)$"
-            ],
-            "install-stages": [
-                    {
-                        "type": "shell-cmd",
-                        "cmd": ["{pkg-scripts}/tclsh.sh", "{major}.{minor}.{patch}", "{lpkgm-prefix}/common"],
-                        "files": {
-                            "installed-files-list": ["tcl.src/unix/installed-files.txt"]
-                        }
-                    }
-            ]
-        },
-        "autoconf": {
-            "version-regex": [
-                    "^(?P<major>[0-9]+)\\.(?P<minor>[0-9]+)$"
-            ],
-            "install-stages": [
-                    {
-                        "type": "shell-cmd",
-                        "cmd": ["{pkg-scripts}/autoconf.sh", "{major}.{minor}", "{lpkgm-prefix}/common"],
-                        "files": {
-                            "installed-files-list": ["autoconf.src/installed-files.txt"]
-                        }
-                    }
-            ]
-        },
-        "modules": {
-                "version-regex": [
-                    "^v(?P<major>[0-9]+)\\.(?P<minor>[0-9]+)\\.(?P<patch>[0-9]+)$"
-            ],
-            "install-stages": [
-                    {
-                        "type": "shell-cmd",
-                        "cmd": ["{pkg-scripts}/modules.sh", "v{major}.{minor}.{patch}", "{lpkgm-prefix}/common"],
-                        "files": {
-                            "installed-files-list": ["modules.src/installed-files.txt"]
-                        }
-                    }
-            ]
-        }
-    }
+    "packages": [
+        "{pwd}/pkg-defs/*/*.json"
+    ]
 }

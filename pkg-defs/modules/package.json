@@ -1,0 +1,14 @@
+{
+  "version-regex": [
+    "^v(?P<major>[0-9]+)\\.(?P<minor>[0-9]+)\\.(?P<patch>[0-9]+)$"
+  ],
+  "install-stages": [
+    {
+      "type": "shell-cmd",
+      "cmd": ["{pkgDir}/build.sh", "v{major}.{minor}.{patch}", "{lpkgm-prefix}/common"],
+      "files": {
+       "installed-files-list": ["modules.src/installed-files.txt"]
+      }
+    }
+  ]
+}

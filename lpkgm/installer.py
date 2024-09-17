@@ -1,9 +1,12 @@
-import copy
+import os, copy
 from collections import defaultdict
 import logging, shutil, tempfile, pathlib, glob
 import gitlab
 from fnmatch import fnmatch
 from datetime import datetime
+
+from lpkgm.settings import gSettings
+from lpkgm.utils import execute_command
 
 class Installer(object):
     """
@@ -14,13 +17,17 @@ class Installer(object):
     installation pipeline. The pcakage manifest should provide a sequence of
     calls of methods listed below in section "methods".
     """
-    def __init__(self, items, modulescript=None):
+    def __init__(self, items, modulescript=None, pkgDefs=None):
         self._items = copy.copy(items)
         self._onExit = []
         self._packageFiles = {}
         self._installedFSEntries = []
         self._dependencies = []
         self._modulescript=modulescript
+
+        self._fmtDict = copy.deepcopy(gSettings['definitions'])
+        if pkgDefs:
+            self._fmtDict.update(pkgDefs)
 
     def __call__(self, *args, **kwargs):
         L = logging.getLogger(__name__)
@@ -139,8 +146,8 @@ class Installer(object):
         and returns dictionary with file details definitions.
         """
         L = logging.getLogger(__name__)
-        fmtDct = copy.copy(pkgVer)
-        fmtDct.update(gSettings['definitions'])
+        fmtDct = copy.copy(self._fmtDict)
+        fmtDct.update(pkgVer)
         if publishedAtTimeInterval is None:
             publishedAtTimeInterval = [None, None]
         if publishedAtTimeInterval[0] and type(publishedAtTimeInterval[0]) is str:
@@ -184,7 +191,7 @@ class Installer(object):
             # "sourceCodeVersion" which will be used instead for querying package.
             pkgQueryParams['package_version']=pkgVer['fullVersion']
             if sourceCodeVersion:
-                fmtDict = copy.copy(gSettings['definitions'])
+                fmtDict = copy.copy(self._fmtDict)
                 fmtDict.update(pkgVer)
                 if type(sourceCodeVersion) is str:
                     sourceCodeVersion = [sourceCodeVersion]
@@ -334,8 +341,8 @@ class Installer(object):
                     ' by previous stage(s).')
         if not prefix:
             raise RuntimeError('Invalid prefix argument; can\'t install cpack archive.')
-        fmtDct = copy.copy(pkgVer)
-        fmtDct.update(gSettings['definitions'])
+        fmtDct = copy.copy(self._fmtDict)
+        fmtDct.update(pkgVer)
         prefix = prefix.format(**fmtDct)
         pathlib.Path(prefix).mkdir(parents=True, exist_ok=True)
         # installation of cpack archive is rather simple:
@@ -361,8 +368,8 @@ class Installer(object):
                     ' by previous stage(s).')
         if not prefix:
             raise RuntimeError('Invalid prefix argument; can\'t install cpack archive.')
-        fmtDct = copy.copy(pkgVer)
-        fmtDct.update(gSettings['definitions'])
+        fmtDct = copy.copy(self._fmtDict)
+        fmtDct.update(pkgVer)
         prefix = prefix.format(**fmtDct)
         pathlib.Path(prefix).mkdir(parents=True, exist_ok=True)
         # installation of cpack archive is rather simple:
@@ -381,8 +388,8 @@ class Installer(object):
         if 'modulefile' not in self._packageFiles:
             raise RuntimeError('No "modulefile" in package files provided by'
                     ' previous stage(s)')
-        fmtDct = {'pkgVer': pkgVer}
-        fmtDct.update(gSettings['definitions'])
+        fmtDct = copy.copy(self._fmtDict)
+        fmtDct['pkgVer'] = pkgVer
         mfPath = os.path.join(gSettings['modulepath'], pkgName, pkgVer['fullVersion'])
         #mfPath = os.path.realpath(os.path.expandvars(moduleFileTemplate.format(**fmtDct)))
         mfPathDir = os.path.dirname(mfPath)
@@ -433,8 +440,8 @@ class Installer(object):
 
     def shell_cmd(self, pkgName, pkgVer, cmd, files=None, cwd=None, assetFiles=None):
         L = logging.getLogger(__name__)
-        fmtDct = copy.copy(pkgVer)
-        fmtDct.update(gSettings['definitions'])
+        fmtDct = copy.copy(self._fmtDict)
+        fmtDct.update(pkgVer)
         if files is None: files = {}
         if not assetFiles: assetFiles = []
         cmd_ = []

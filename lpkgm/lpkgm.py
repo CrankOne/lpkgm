@@ -1,77 +1,17 @@
 #!/usr/bin/env python3
 
 import os, sys, logging, json, copy, shutil, subprocess, re
-import requests, traceback, pathlib, glob, pickle
+import traceback, pathlib
 from fnmatch import fnmatch
 from datetime import datetime
 import prettytable
 import gitlab
 
-#
-# Default settings specific to particular deployment share. Gets overloaded
-# by settings .json file at entry point.
-
-gSettings = {
-    # Location of installed packages manifests
-    'packages-registry-dir' : './registry.d',
-    # GitLab tokens are stored here (per-project); sometimes they are not
-    # needed, as within CI/CD pipelines the (temporary) pipeline token is used
-    'gitlab-tokens-dir'     : '/etc/gitlab-ci-tokens/',
-    # Dictionary of common definitions used to format paths, additionaly to
-    # package's ones
-    'definitions'           : {},
-    # Build directory prefix; gettempprefix() is used, if None
-    'tmp-dir-prefix'        : None,
-    # Where modules of installed files should be located
-    'modulepath'            : '/usr/share/modules/modulefiles/'
-}
-
-def read_settings_file(settingsFilePath, definitions=None):
-    """
-    Reads settings file (.json).
-
-    This file has particular schema which we are planning to standardize at
-    some point. This is NOT a pure function as it changes ``gSettings``
-    object.
-
-    TODO: foresee possibility to append "packages" with external modules.
-    """
-    L = logging.getLogger(__name__)
-    # initialize definitions to empty list, if not given
-    if not definitions: definitions=[]
-    # load file
-    if not os.path.isfile(settingsFilePath):
-        raise RuntimeError(f"Not a file: \"{settingsFilePath}\"")
-    with open(settingsFilePath) as f:
-        settings = json.load(f)
-    # expand variables in definitions until there is no more to expand; note
-    # that it directly affects gSettings
-    # (todo: detect infinite loop?)
-    if definitions:
-        for entry in definitions:
-            k, v = entry.split('=')
-            gSettings['definitions'][k] = v
-    for k, v in settings['definitions'].items():
-        gSettings['definitions'][k] = os.path.expandvars(v)
-    while True:
-        hadChange = False
-        for k, v in gSettings['definitions'].items():
-            newVal = v.format(**gSettings['definitions'])
-            if newVal != v:
-                adChange = True
-            gSettings['definitions'][k] = newVal
-        if hadChange: break
-    # modify gSettings, substituting 1st level entries
-    for k, v in settings.items():
-        if k in ('packages', 'definitions'): continue  # omit some keys
-        if v is None:
-            gSettings[k] = None
-            continue
-        gSettings[k] = os.path.expandvars(v.format(**gSettings['definitions']))
-    # normalize tokens and registry dir paths
-    for k in ('gitlab-tokens-dir', 'packages-registry-dir'):
-        gSettings[k] = os.path.normpath(gSettings[k])
-    return settings
+from lpkgm.settings import read_settings_file, gSettings
+from lpkgm.dependencies import PkgGraph
+from lpkgm.utils import packages, pkg_manifest_file_path, stats_summary, \
+        get_package_manifests, sizeof_fmt
+from lpkgm.installer import Installer
 
 #                                                                     ________
 # __________________________________________________________________/ Actions
@@ -108,7 +48,10 @@ def install_package(pkgName, pkgVerStr, pkgSettings, use=None, modulescript=None
         return False
 
     # Instantiate installer pipeline (with respect to specified stages)
-    installer = Installer(pkgSettings['install-stages'], modulescript=modulescript)
+    installer = Installer( pkgSettings['install-stages']
+            , modulescript=modulescript
+            , pkgDefs=pkgSettings['definitions']
+            )
 
     # Resolve dependencies
     usedDeps = set()
@@ -152,8 +95,11 @@ def install_package(pkgName, pkgVerStr, pkgSettings, use=None, modulescript=None
         json.dump(pkgInfo, f, indent=2, sort_keys=True)
     # append dep graph if need
     if depGraph:
-        for dep in installer.dependenciesList:
-            depGraph.add((pkgName, pkgVerStr), tuple(dep))
+        if installer.dependenciesList:
+            for dep in installer.dependenciesList:
+                depGraph.add((pkgName, pkgVerStr), tuple(dep))
+        else:
+            depGraph.add_pkg(pkgName, pkgVerStr)
     # run clean-up procedures
     installer.on_exit(emergency=False)
     L.info(f'Package "{pkgName}" of version "{pkgVerStr}"'
@@ -221,6 +167,7 @@ def uninstall_package(pkgName, pkgData, depGraph=None):
 def uninstall_packages(pkgNamePat, pkgVerStrPat, pkgs, autoConfirm=False, depGraph=None, keep=None):
     L = logging.getLogger(__name__)
     rmQueue = []
+    if keep is None: keep=[]
     for pkgName, pkgSettings in pkgs:
         pkgData = get_package_manifests(pkgName, pkgVerStrPat, exclude=list(k.split('/') for k in keep))
         if not pkgData:
@@ -405,14 +352,14 @@ def lpkgm_run_from_cmd_args(argv):
     # NOTE: returned object is the original JSON, while gSettings is updated with
     # expanded vars, normalized paths, etc, as a side effect of `read_settings_file()`
     # function.
-    settings = read_settings_file(args.settings, definitions=args.define)
+    origSettingsObj = read_settings_file(args.settings, definitions=args.define)
     # get package config, if pkgName specified
     pkgSettings = []
     if args.mode in ('install', 'add',  'remove', 'uninstall', 'delete', 'rm') and args.pkgName:
         # consider pkgName as as shell-style wildcard (use fnmatch)
-        for k in settings['packages'].keys():
+        for k in gSettings['packages'].keys():
             if not fnmatch(k, args.pkgName): continue
-            pkgSettings.append((k, settings['packages'][k]))
+            pkgSettings.append((k, gSettings['packages'][k]))
         if not pkgSettings:
             L.critical(f'Package "{args.pkgName}" is not known.')
             return False
@@ -422,7 +369,7 @@ def lpkgm_run_from_cmd_args(argv):
             and not os.path.isdir(gSettings['packages-registry-dir']):
         #or not os.access(gSettings['packages-registry-dir'], os.W_OK)):
         registryDir = gSettings['packages-registry-dir']
-        if registryDir != settings['packages-registry-dir']:
+        if registryDir != origSettingsObj['packages-registry-dir']:
             # (expanded not identically)
             L.critical(f'Directory "{gSettings["packages-registry-dir"]}"'
                     + f' (resolved to "{registryDir}") does not exist.')# or is not'

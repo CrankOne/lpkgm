@@ -2,6 +2,8 @@ import os, requests, logging, json, subprocess, glob
 from fnmatch import fnmatch
 from tqdm import tqdm
 
+from lpkgm.settings import gSettings
+
 def pkg_manifest_file_path(pkgName, pkgVer):
     # NOTE: shell-style wildcard will result in a wildcard
     # path (that's an anticipated case)
@@ -133,7 +135,7 @@ def execute_command(cmd, cwd=None, env=os.environ, joinStreams=False):
         else:
             L.error(f'combined stdout and stderr output of the command (exit code {p.returncode}):')
             L.error(outs.decode())
-        raise RuntimeError('Shell command failed.')
+        raise RuntimeError(f'Shell command failed with code {p.returncode}.')
     # forward stderr output, if any
     #if errs:
     #    L.warning(errs.decode())
