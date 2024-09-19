@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 """
+This Python script recursively walks in the given subject directory collecting
+hashsums of files and sub-directories. Collected index is used then to reveal
+duplicating entries with respect to same dir content or some another directory
+considered as "original".
+
 Simplest possible usage scenario is very similar to ``rmlint -D`` --
 within a subtree of a single dir (subject dir), duplicating files will be
 substituted by hardlinks. It is also possible to reveal identical directories
@@ -1095,7 +1100,7 @@ def add_argument_parser_options(p):
             , action='append', dest='origRules'
             )
     p.add_argument('--handle-symlinks', help='Way to handle symlinks in subject'
-            ' and/or base directory. This option has no effect, when'
+            ' and/or base directory. Has no effect when'
             ' --use-diff is specified.'
             , choices=['consider', 'dereference', 'ignore']
             , default='consider'
@@ -1129,15 +1134,15 @@ def add_argument_parser_options(p):
     p.add_argument('--report-no-labels', help='Disables labels in the report'
             ' output', dest='reportLabels', action='store_false')
     reportColorsGroup = p.add_mutually_exclusive_group()
-    reportColorsGroup.add_argument('--report-colors', help='Forces colors in'
+    reportColorsGroup.add_argument('--report-colors', help='Forces coloring in'
             ' report printing.'
             , action='store_true', dest='reportColors', default=None)
-    reportColorsGroup.add_argument('--report-no-colors', help='Forces colors in'
-            ' report printing.'
+    reportColorsGroup.add_argument('--report-no-colors', help='Forcefully'
+            ' disables colors in report printing.'
             , action='store_true', dest='reportNoColors', default=None)
 
 
-def main( subjDir, baseDir=None, destDir=None, dryRun=False, useDiff=None
+def run( subjDir, baseDir=None, destDir=None, dryRun=False, useDiff=None
         , outDiff=None
         , handleSymlinks='consider'
         , origRules=None
@@ -1325,11 +1330,13 @@ gLoggingConfig = {
     }
 }
 
-if '__main__' == __name__:
+def main():
     import argparse
     import logging.config
     p = argparse.ArgumentParser(prog=sys.argv[0]
-            , description='Creates incremental directory snapshot or de-duplicates directory.'
+            , description='Creates incremental directory snapshot or'
+                ' substitutes duplicating files and dirs with links within'
+                ' a directory.'
             , epilog=__doc__
             )
     verbGroup = p.add_mutually_exclusive_group()
@@ -1357,3 +1364,5 @@ if '__main__' == __name__:
     argsDict.pop('subjDir')
     sys.exit(main(subjDir, **argsDict))
 
+if '__main__' == __name__:
+    main()

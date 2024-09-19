@@ -17,8 +17,10 @@ gSettings = {
     'tmp-dir-prefix'        : None,
     # Where modules of installed files should be located
     'modulepath'            : '/usr/share/modules/modulefiles/',
-
-    'packages'              : {}
+    # Known packages list
+    'packages'              : {},
+    # List of user's extensions (must be Python modules)
+    'installer-extensions'  : ['lpkgm.default_installer']
 }
 
 def _packages_from_descriptions(descriptions, settingsDir):

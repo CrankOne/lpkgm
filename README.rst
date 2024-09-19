@@ -28,7 +28,7 @@ What it does:
   some packages in the userspace/custom location (by prefix installation).
 - track on the installed versions and files, foreseeing some degree of
   runtime control by means
-  of `Linux Environment Modules <https://modules.readthedocs.io/en/latest/modulefile.html>`
+  of `Linux Environment Modules <https://modules.readthedocs.io/en/latest/modulefile.html>`_
   and thus providing abilities to work with different versions and bundles of
   package versions
 - maintain dependency tree composed of multiple package versions within
@@ -40,7 +40,7 @@ What it does not (or not well-suited for):
 
 - Cross-platform builds
 - Binary-deterministic builds in isolated environments
-  (for this kind of tool, see `Bob <https://bobbuildtool.dev/>`)
+  (for this kind of tool, see `Bob <https://bobbuildtool.dev/>`_)
 - Does not maintain entire Linux distribution (LFS)
 - Management of thousands of installed packages should be tedious due to
   absence of database.
@@ -56,7 +56,16 @@ Having few packages on different repositories a team would like to maintain
 CI/CD pipeline which will:
 
 - handle certain commits (in branch or tagged)
-- build, test and deploy packages linked 
+- build, test, deploy and uninstall packages on the network file share(s)
+- labeled with certain version tag, provide access to multiple versions
+  switching between them with Linux environment modules
+- maintain packages with fairly large amount static assets (e.g. calibration
+  data, databases, etc)
+
+In cases when CMake is used, the package can be distributed
+with `CPack <https://cmake.org/cmake/help/latest/module/CPack.html>`_. In cases
+when it is not enough, an installer extension module can be utilized (including
+a shell script).
 
 Reference document structure
 ============================

@@ -41,6 +41,7 @@ d = {
         'entry_points' : {
             'console_scripts': [
                 'lpkgm=lpkgm.lpkgm:main',
+                'lpkgm-dir-diff=lpkgm.reduce_dir:main'
             ]
         },
     }
