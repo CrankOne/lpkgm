@@ -69,7 +69,9 @@ def install_package(pkgName, pkgVerStr, pkgSettings, use=None, modulescript=None
     for expectedDep in expectedDeps:
         if expectedDep[0] in usedDeps: continue
         if expectedDep[1]:
-            raise RuntimeError(f'Missing dependency {expectedDep[0]} of {pkgName}.')
+            raise RuntimeError(f'Missing required package {expectedDep[0]} (of {pkgName}).')
+        else:
+            L.info('Missing optional package {expectedDep[0]} (of {pkgName})')
 
     # Perform installation
     if not installer(pkgName, pkgVer):
@@ -414,9 +416,12 @@ def lpkgm_run_from_cmd_args(argv):
             else:
                 L.critical(f'Error: unknown sub-command: "{args.mode}".')
                 assert False
-    except Exception:
-        L.critical(f'Error occured during execution of {args.mode}:')
-        traceback.print_exc()
+    except Exception as e:
+        if logging.DEBUG >= logging.root.level:
+            L.critical(f'Error occured during execution of {args.mode}:')
+            traceback.print_exc()
+        else:
+            L.critical(f'Exit due to an error: {str(e)}')
         return False
 
 # Logging config for "app mode" (when running as a script,
@@ -465,6 +470,9 @@ gLoggingConfig = {
 
 def main():
     import logging.config
+    loglevel = os.getenv('LOGLEVEL', 'INFO')
+    gLoggingConfig['handlers']['default']['level'] = loglevel
+    gLoggingConfig['loggers']['']['level'] = loglevel
     logging.config.dictConfig(gLoggingConfig)
     sys.exit(0 if lpkgm_run_from_cmd_args(sys.argv) else 1)
 

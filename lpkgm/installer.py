@@ -6,7 +6,7 @@ from fnmatch import fnmatch
 from datetime import datetime
 
 from lpkgm.settings import gSettings
-from lpkgm.utils import execute_command
+from lpkgm.utils import execute_command, get_package_manifests
 
 gInstallerPluginPrefix='lpkgm_installer_'
 
@@ -30,7 +30,7 @@ class Installer(object):
         self._packageFiles = {}
         self._installedFSEntries = []
         self._dependencies = []
-        if modulescript and not os.path.isfile(self._modulescript):
+        if modulescript and not os.path.isfile(modulescript):
             raise RuntimeError(f'Module script is not a file ("{self._modulescript}")')
         self._modulescript=modulescript
         # build formatting dictionary for package
@@ -164,9 +164,9 @@ class Installer(object):
         pkgData = get_package_manifests(pkgName, pkgVer)
         if not pkgData:
             raise RuntimeError(f'Package is not installed: {pkgName} of'
-                + f' version {pkgVerStr} (no install manifest file exists)')
+                + f' version {pkgVer} (no install manifest file exists)')
         if 1 != len(pkgData):
-            raise RuntimeError(f'Multiple packages match {pkgName}/{pkgVerStr}')
+            raise RuntimeError(f'Multiple packages match {pkgName}/{pkgVer}')
         #self._dependencies.append(pkgData[0])  # xxx?
         #pkgVerStr = pkgVer if type(pkgVer) is str else pkgVer['version']['fullVersion']
         #print('xxx', (pkgName, pkgVer['version']) )

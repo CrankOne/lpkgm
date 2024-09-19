@@ -1,4 +1,4 @@
-import os, logging, json, glob
+import os, logging, json, glob, re
 
 #
 # Default settings specific to particular deployment share. Gets overloaded
@@ -26,38 +26,70 @@ gSettings = {
 def _packages_from_descriptions(descriptions, settingsDir):
     L = logging.getLogger(__name__)
     for item in descriptions:
+        if type(item) is str:
+            # assumed a standalone package in a file -- load for
+            # further treatment. If "name" is not given explicitly within
+            # loaded object, use filename without extension as package name
+            if not os.path.isfile(item):
+                raise RuntimeError(f'Not a file: {item}')
+            with open(item, 'r') as f:
+                pkgData = json.load(f)
+            if 'name' not in pkgData:
+                pkgData['name'] = os.path.splitext(os.path.basename(item))[0]
+            L.debug(f'Loaded JSON package data from {item}')
+            item = pkgData
         if type(item) is dict:
+            # assumed a standalone package -- get the "name" from object
+            # and use the rest as package definition
             pkgName = item['name']
             item.pop('name')
             yield pkgName, item, settingsDir
-        elif type(item) is str:
-            pathItem = os.path.expandvars(item.format(**gSettings['definitions']))
-            if os.path.isfile(pathItem):
-                with open(pathItem, 'r') as f:
-                    item = json.load(f)
-                pkgName = item['name']
-                item.pop('name')
-                yield pkgName, item, pathItem
-            else:
-                L.debug(f'Getting package descriptions from {pathItem}')
-                nPkgs = 0
-                for pkgDefFilePath in glob.glob(pathItem):
-                    # derive package name from dir
-                    pkgDir, _ = os.path.split(pkgDefFilePath)
-                    pkgDir, pkgName = os.path.split(pkgDir)
-                    L.debug(f"Loading package definition from {pkgDefFilePath} for"
-                            f" package \"{pkgName}\"")
-                    with open(pkgDefFilePath) as f:
-                        pkgDef = json.load(f)
-                    # append packages' "definitions" attribute with package's local
-                    #if 'definitions' not in pkgDef: pkgDef['definitions'] = {}
-                    #pkgDef['definitions']['pkgDir'] = pkgDir
-                    # interpolate special variable in the package definition object
-                    # (recursively)
-                    yield pkgName, pkgDef, pkgDefFilePath
-                    nPkgs += 1
-                if not nPkgs:
-                    L.warning(f'No packages found in {pathItem}')
+        elif type(item) in (list, tuple) and 2 == len(item):
+            # otherwise, assume a complex case, used for large software
+            # bundles repo: a file lookup wildcard with regular expression
+            pathWildcard, rx = item
+            pathWildcard = os.path.expandvars(pathWildcard.format(**gSettings['definitions']))
+            L.debug('Getting package descriptions from glob'
+                    + f' pattern {pathWildcard} matching regular expression "{rx}"')
+            rx = re.compile(rx)
+            nPkgs = 0
+            for pkgDefFilePath in glob.glob(pathWildcard):
+                m = rx.match(pkgDefFilePath)
+                if not m:
+                    L.debug(f'{pkgDefFilePath} does not match regular expression')
+                    continue
+                # parse path extracting user-defined additions to the package's
+                # definitions
+                pathSemantics = dict(m.groupdict())
+                # load package data
+                with open(pkgDefFilePath) as f:
+                    pkgDef = json.load(f)
+                pkgName = None
+                if 'name' in pkgDef.keys():
+                    # "name" given in .json has priority over regular
+                    # expression tokens
+                    pkgName = pkgDef['name']
+                    pkgDef.pop('name')
+                elif 'name' in pathSemantics.keys():
+                    # otherwise -- try to get package name from "name" rx
+                    # matching group
+                    pkgName = pathSemantics['name']
+                    pathSemantics.pop('name')
+                else:
+                    # otherwise, consider filename without extension as package
+                    # name
+                    pkgName = os.path.splitext(os.path.basename(pkgDefFilePath))[0]
+                assert pkgName
+                pkgDir, _ = os.path.split(pkgDefFilePath)
+                L.debug(f"Loaded package definition from {pkgDefFilePath} for"
+                        f" package \"{pkgName}\"")
+                yield pkgName, pkgDef, pkgDefFilePath
+                nPkgs += 1
+            if not nPkgs:
+                L.warning(f'No packages found in {pathWildcard}')
+        else:
+            raise RuntimeError(f'Unable to interpret "packages" entry "{item}"'
+                    + ' as package(s) definition.')
 
 def read_settings_file(settingsFilePath, definitions=None):
     """
@@ -75,7 +107,8 @@ def read_settings_file(settingsFilePath, definitions=None):
         raise RuntimeError(f"Not a file: \"{settingsFilePath}\"")
     with open(settingsFilePath) as f:
         settings = json.load(f)
-    assert 'definitions' in settings.keys()
+    if 'definitions' not in settings.keys():
+        settings['definitions'] = {}
     # append some common definitions
     if 'pwd' not in settings['definitions'].keys():
         settings['definitions']['pwd'] = os.getcwd()
@@ -132,3 +165,5 @@ def read_settings_file(settingsFilePath, definitions=None):
     for k in ('gitlab-tokens-dir', 'packages-registry-dir'):
         gSettings[k] = os.path.normpath(gSettings[k])
     return settings
+
+

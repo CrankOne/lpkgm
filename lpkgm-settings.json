@@ -1,7 +1,6 @@
 {
     "definitions": {
-        "lpkgm-prefix": "{pwd}/sft/",
-        "pkg-scripts": "./pkg-scripts/"
+        "lpkgm-prefix": "{pwd}/sft/"
     },
     "gitlab-tokens-dir": "$HOME/.gitlab-ci-tokens/",
     "packages-registry-dir": "{lpkgm-prefix}/.packages/",
@@ -9,6 +8,6 @@
     "modulepath": "{lpkgm-prefix}/modulefiles",
 
     "packages": [
-        "{pwd}/pkg-defs/*/*.json"
+        ["{pwd}/pkg-defs/*/*.json", ".*/(?P<name>[^/]+)/package.json"]
     ]
 }

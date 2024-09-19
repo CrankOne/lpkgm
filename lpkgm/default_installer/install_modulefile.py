@@ -1,4 +1,4 @@
-import os, copy, shutil, logging
+import os, copy, shutil, logging, pathlib
 from lpkgm.settings import gSettings
 
 def run(self, pkgName, pkgVer, parseDependencies=False):
