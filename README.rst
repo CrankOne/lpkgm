@@ -63,9 +63,9 @@ CI/CD pipeline which will:
   data, databases, etc)
 
 In cases when CMake is used, the package can be distributed
-with `CPack <https://cmake.org/cmake/help/latest/module/CPack.html>`_. In cases
-when it is not enough, an installer extension module can be utilized (including
-a shell script).
+with `CPack <https://cmake.org/cmake/help/latest/module/CPack.html>`_. If it
+is not enough, an installer extension module can be utilized (up to lowest
+level of a shell script).
 
 Reference document structure
 ============================
