@@ -1,7 +1,10 @@
-import os, logging, pickle
+import os, logging, pickle, datetime
+
+from collections import defaultdict
 
 from lpkgm.utils import packages
 from lpkgm.settings import gSettings
+from lpkgm.utils import get_package_manifests
 
 # networkx warning workaround (need only for Python 3.9)
 import warnings
@@ -22,15 +25,18 @@ class PkgGraph(object):
         Generates networkx graph of dependencies based on package
         manifest files.
         """
+        L = logging.getLogger(__name__)
         dg = nx.DiGraph()
         deps = []
         for pkgData, pkgFilePath in packages():
             pkgName, pkgVer = pkgData['package'], pkgData['version']['fullVersion']
+            # add node to graph
             dg.add_node((pkgName, pkgVer))
             for dep in pkgData['dependencies']:
                 deps.append(( (pkgName, pkgVer)
                             , tuple(dep)
                             ))
+        # connect dependencies
         for depRel in deps:
             dg.add_edge(*depRel)
         return dg
@@ -66,10 +72,12 @@ class PkgGraph(object):
             pickle.dump(self.g, f, pickle.HIGHEST_PROTOCOL)
 
     def dependency_of(self, pkgName, pkgVer):
-        return list(item[0] for item in self.g.in_edges((pkgName, pkgVer)))
+        pv = pkgVer if type(pkgVer) is str else pkgVer['fullVersion']
+        return list(item[0] for item in self.g.in_edges((pkgName, pv)))
 
     def depends_on(self, pkgName, pkgVer):
-        return list(item[1] for item in self.g.out_edges((pkgName, pkgVer)))
+        pv = pkgVer if type(pkgVer) is str else pkgVer['fullVersion']
+        return list(item[1] for item in self.g.out_edges((pkgName, pv)))
 
     def add(self, pkg1, pkg2):
         """
@@ -108,6 +116,51 @@ class PkgGraph(object):
     def add_pkg(self, pkgName, pkgVer):
         self.g.add_node((pkgName, pkgVer))
         self._dirty = True
+
+    def get_protecting_rules(self, pkgName, pkgVersion, installTime
+            , protectionRules=None
+            , recursive=True
+            , r=None
+            ):
+        """
+        Returns list of 3-element tuples:
+            (pkgName:str, pkgStrVer:str ruleLabel:str)
+        denoting reason of this package being protected from removal.
+        If `recursive` is `False`, returned
+        package name is always eponymous to the argument (`pkgName`),
+        otherwise depenant packages can be pulled in.
+        """
+        if r is None:
+            r = []
+        if not recusive:
+            if not protectionRules:
+                # makes no sense -- current package without any protection
+                # rules and without dependencies
+                return r
+            # for non-recusive check, make sure no protection rule covers
+            # this package
+            if pkgName not in protectionRules.keys():
+                # no protection rule(s) covering this pkg
+                return r
+            protectedByRules = []
+            for rule in protectionRules[pkgName]:
+                if rule(pkgVersion, installTime):
+                    protectedByRules.append(rule.label)
+            r.append(pkgName, pkgVersion['fullVersion'], protectedByRules, [])
+            return r
+        # do the recursive check
+        # Get all the packages depending on given, append the rules list
+        for dpName, dpVer in self.dependency_of(pkgName, pkgVersion['fullVersion']):
+            rr = []
+            # to get installed time we have to load full manifest :(
+            dpData = get_package_manifests(dpName, dpVer)
+            dpInstalledAt = datetime.datetime.fromisoformat(dpData['installedAt'])
+            self.get_protecting_rules(dpName, dpVer, dpInstalledAt
+                    , protectionRules=protectionRules
+                    , recursive=True, r=rr
+                    )
+            r.append((dpName, dpVer, None, rr))
+        return r
 
     def __enter__(self):
         return self

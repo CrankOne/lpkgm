@@ -1,4 +1,5 @@
 import os, logging, json, glob, re
+import lpkgm.protection
 
 #
 # Default settings specific to particular deployment share. Gets overloaded

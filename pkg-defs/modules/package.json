@@ -10,5 +10,6 @@
        "installed-files-list": ["modules.src/installed-files.txt"]
       }
     }
-  ]
+  ],
+  "protection-rules": [{"label": "system", "type": "always"}]
 }

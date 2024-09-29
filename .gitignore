@@ -5,3 +5,5 @@ lpkgm.egg-info/*
 sft/*
 lpkgm/__pycache__/*
 lpkgm/default_installer/__pycache__/*
+test/__init__.py
+test/__pycache__/*

@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from datetime import datetime
 import prettytable
 import gitlab
+import networkx as nx
 
 from lpkgm.settings import read_settings_file, gSettings
 from lpkgm.dependencies import PkgGraph
@@ -166,7 +167,9 @@ def uninstall_package(pkgName, pkgData, depGraph=None):
     L.info(f'"{pkgName}" of version "{pkgVerStr}" removed.')
     return True
 
-def uninstall_packages(pkgNamePat, pkgVerStrPat, pkgs, autoConfirm=False, depGraph=None, keep=None):
+def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
+        , protectionRules=None
+        , autoConfirm=False, depGraph=None, keep=None):
     L = logging.getLogger(__name__)
     rmQueue = []
     if keep is None: keep=[]
@@ -180,10 +183,24 @@ def uninstall_packages(pkgNamePat, pkgVerStrPat, pkgs, autoConfirm=False, depGra
                 raise RuntimeError(f'Package is not installed: {pkgName} (matching "{pkgNamePat}") of'
                     + f' version "{pkgVerStrPat}" (no install manifest file exist)')
         for pkgDatum in pkgData:
-            # TODO: check if package is in the dependencies list of something
-            #       and prevent user from breaking dependencies.
+            # get protection rules; note, that even for unprotected packages,
+            # deletion will be prohibited by non-trivial result (at least one
+            # tuple of the form [(name, version, None, [...])] will be returned
+            protectedBy = depGraph.get_protecting_rules( pkgName
+                    , pkgDatum['version'], datetime.datetime.fromisoformat(pkgDatum['installedAt'])
+                    , protectionRules=protectionRules)
+            if protectedBy or not (protectedBy[3] or protectedBy[4]):
+                # ^^^ 1 - name, 2 - ver, 3 - rule label, 4 - provided pkgs
+                #     so "not (protectedBy[3] or protectedBy[4])" is equivalent
+                #     to "not protected by rule and does nor provide pkgs"
+                for peName, peVer, peRule, peSub in protectedBy:
+                    if peRule:
+                        L.info(f'"{peName}-{peVer}" is protected by "{peRule}"')
+                    else:
+                        L.info(f'"{peName}-{peVer}" provides packages:')
             rmQueue.append((pkgName, pkgDatum))
     assert rmQueue
+
     rmInfoMsg = f'Packages selected for deletion ({len(rmQueue)}):'
     pTable = prettytable.PrettyTable()
     pTable.field_names = ['Package', 'Version', 'Stats']  # TODO: dependency of?
@@ -423,6 +440,7 @@ def lpkgm_run_from_cmd_args(argv):
         else:
             L.critical(f'Exit due to an error: {str(e)}')
         return False
+
 
 # Logging config for "app mode" (when running as a script,
 # configured from main())

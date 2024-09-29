@@ -86,24 +86,4 @@ class VersionsOrder(object):
         result = {}
         for orthoKey, versions in versionsByOrtogonalAttr.items():
             yield orthoKey, list((k, versions[k]) for k in sorted(versions.keys()))
-        
 
-testVersions = [
-    ({'major': 1,    'minor': 2,    'patch': None, 'commit': None      , 'buildConf': 'test'}, 123),
-    ({'major': 1,    'minor': None, 'patch': 23,   'commit': 'deadbeef', 'buildConf': None  }, 325),
-    ({'major': 1,    'minor': 0,    'patch':  1,   'commit': '12ef32ea', 'buildConf': None  }, 457),
-    ({'major': 1,    'minor': 0,    'patch':  1,   'commit': '12ef32ea'                     }, 456),
-]
-
-if "__main__" == __name__:
-    order = VersionsOrder(ortogonalBy=None)  # set to =[] to disable flavours
-    for flavour, versions in order(testVersions):
-        print(dict(zip(order.flavourKeys, flavour)))
-        for vk, verObject in versions:
-            print(' *', verObject)
-    #
-    order = VersionsOrder(ortogonalBy=[])
-    for flavour, versions in order(testVersions):
-        print(dict(zip(order.flavourKeys, flavour)))
-        for vk, verObject in versions:
-            print(' *', verObject)
