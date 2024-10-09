@@ -4,6 +4,7 @@ from fnmatch import fnmatch
 from datetime import datetime
 import gitlab
 from lpkgm.settings import gSettings
+from lpkgm.utils import get_gitlab_project_token, download_file_http
 
 def run(self, pkgName, pkgVer
         , server=None

@@ -132,12 +132,12 @@ class PkgGraph(object):
         """
         if r is None:
             r = []
-        if not recusive:
+        if not recursive:
             if not protectionRules:
                 # makes no sense -- current package without any protection
                 # rules and without dependencies
                 return r
-            # for non-recusive check, make sure no protection rule covers
+            # for non-recursive check, make sure no protection rule covers
             # this package
             if pkgName not in protectionRules.keys():
                 # no protection rule(s) covering this pkg
@@ -150,10 +150,12 @@ class PkgGraph(object):
             return r
         # do the recursive check
         # Get all the packages depending on given, append the rules list
-        for dpName, dpVer in self.dependency_of(pkgName, pkgVersion['fullVersion']):
+        for dpName, dpVer in self.dependency_of(pkgName, pkgVersion if type(pkgVersion) is str else pkgVersion['fullVersion']):
             rr = []
-            # to get installed time we have to load full manifest :(
+            # to get installed time of depending pkgs as we have to load full manifest :(
             dpData = get_package_manifests(dpName, dpVer)
+            assert len(dpData) == 1
+            dpData = dpData[0]
             dpInstalledAt = datetime.datetime.fromisoformat(dpData['installedAt'])
             self.get_protecting_rules(dpName, dpVer, dpInstalledAt
                     , protectionRules=protectionRules

@@ -71,6 +71,7 @@ def get_gitlab_project_token(projectID, server=None):
     """
     assert projectID
     assert type(projectID) is str
+    L = logging.getLogger(__name__)
     fmtDct = {'server': server}
     fmtDct.update(gSettings['definitions'])
     jobToken = os.environ.get('CI_JOB_TOKEN', None)
@@ -78,6 +79,7 @@ def get_gitlab_project_token(projectID, server=None):
         tokenFilePath = os.path.join( os.path.expandvars(gSettings['gitlab-tokens-dir'].format(**fmtDct))
                 , f'{projectID}.txt'
                 )
+        L.debug(f'No job token; trying to read one from {tokenFilePath}')
         if not os.path.isfile(tokenFilePath):
             raise RuntimeError(f'Not a file: {tokenFilePath}')
         with open(tokenFilePath) as f:

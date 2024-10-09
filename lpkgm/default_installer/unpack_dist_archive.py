@@ -1,4 +1,4 @@
-import copy, pathlib
+import os, copy, pathlib
 
 from lpkgm.utils import execute_command
 

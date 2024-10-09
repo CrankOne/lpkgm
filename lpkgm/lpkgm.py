@@ -6,13 +6,14 @@ from fnmatch import fnmatch
 from datetime import datetime
 import prettytable
 import gitlab
-import networkx as nx
+#import networkx as nx  # XXX
 
 from lpkgm.settings import read_settings_file, gSettings
 from lpkgm.dependencies import PkgGraph
 from lpkgm.utils import packages, pkg_manifest_file_path, stats_summary, \
         get_package_manifests, sizeof_fmt
 from lpkgm.installer import Installer
+from lpkgm.protection import protecting_rules_report, build_protection_rules
 
 #                                                                     ________
 # __________________________________________________________________/ Actions
@@ -137,11 +138,19 @@ def uninstall_package(pkgName, pkgData, depGraph=None):
         while dirs:
             longestPath = list(sorted(dirs, key=lambda de: len(de)))[-1]
             if os.path.isdir(longestPath):
-                L.debug(f'Removing empty dirs starting from {longestPath}')
-                try:
-                    os.removedirs(longestPath)
-                except OSError as e:
-                    if not str(e).startswith('[Errno 39] Directory not empty'):
+                if not os.path.islink(longestPath):
+                    L.debug(f'Removing empty dirs starting from {longestPath}')
+                    try:
+                        os.removedirs(longestPath)
+                    except OSError as e:
+                        if not str(e).startswith('[Errno 39] Directory not empty'):
+                            L.error(f'{str(e)}')
+                            raise
+                else:
+                    L.debug(f'Removing link {longestPath}')
+                    try:
+                        os.unlink(longestPath)
+                    except OSError as e:
                         L.error(f'{str(e)}')
                         raise
             dirs.remove(longestPath)
@@ -183,21 +192,6 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
                 raise RuntimeError(f'Package is not installed: {pkgName} (matching "{pkgNamePat}") of'
                     + f' version "{pkgVerStrPat}" (no install manifest file exist)')
         for pkgDatum in pkgData:
-            # get protection rules; note, that even for unprotected packages,
-            # deletion will be prohibited by non-trivial result (at least one
-            # tuple of the form [(name, version, None, [...])] will be returned
-            protectedBy = depGraph.get_protecting_rules( pkgName
-                    , pkgDatum['version'], datetime.datetime.fromisoformat(pkgDatum['installedAt'])
-                    , protectionRules=protectionRules)
-            if protectedBy or not (protectedBy[3] or protectedBy[4]):
-                # ^^^ 1 - name, 2 - ver, 3 - rule label, 4 - provided pkgs
-                #     so "not (protectedBy[3] or protectedBy[4])" is equivalent
-                #     to "not protected by rule and does nor provide pkgs"
-                for peName, peVer, peRule, peSub in protectedBy:
-                    if peRule:
-                        L.info(f'"{peName}-{peVer}" is protected by "{peRule}"')
-                    else:
-                        L.info(f'"{peName}-{peVer}" provides packages:')
             rmQueue.append((pkgName, pkgDatum))
     assert rmQueue
 
@@ -214,15 +208,27 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
         pTable.add_row([pkgName, pkgVerStr, stats_summary(pkgDatum["stats"])])
         if depGraph:
             # check we really can delete the package not breaking any dependant packages
-            provides = depGraph.dependency_of(pkgName, pkgVerStr)
-            if provides:
-                providesStr = ', '.join(f'{depName}/{depVer}' for depName, depVer in provides)
-                blocks.append(f'    {pkgName}/{pkgVerStr} is needed by {providesStr}')
+            #provides = depGraph.dependency_of(pkgName, pkgVerStr)
+            #if provides:
+            #    providesStr = ', '.join(f'{depName}/{depVer}' for depName, depVer in provides)
+            #    blocks.append(f'    {pkgName}/{pkgVerStr} is needed by {providesStr}')
+            # ---
+            # get protection rules; note, that even for unprotected packages,
+            # deletion will be prohibited by non-trivial result (at least one
+            # tuple of the form [(name, version, None, [...])] will be returned
+            protectedBy = depGraph.get_protecting_rules( pkgName
+                    , pkgDatum['version'], datetime.fromisoformat(pkgDatum['installedAt'])
+                    , protectionRules=protectionRules)
+            if protectedBy and (protectedBy[0][3] or protectedBy[0][4]):
+                # ^^^ 1 - name, 2 - ver, 3 - rule label, 4 - provided pkgs
+                #     so "protectedBy[3] or protectedBy[4]" is equivalent
+                #     to "protected by rule or provides pkg(s)"
+                blocks.append(protecting_rules_report(protectedBy))
     rmInfoMsg += '\n' + str(pTable)
     L.info(rmInfoMsg)
     if blocks:
         L.critical('Following issues found for deletion request:\n' + '\n'.join(blocks))
-        raise RuntimeError('Installed packages depends on packages queued for removal.')
+        raise RuntimeError('Other installed package depends on package(s) queued for removal.')
     if not autoConfirm:
         if sys.stdin.isatty():
             answer = ''
@@ -364,6 +370,9 @@ def lpkgm_run_from_cmd_args(argv):
     #        ' shown.', choices=('ascii', 'html', 'json'), default='ascii'
     #        , dest='format_')
     # ... other args for show mode
+    gcP = subparsers.add_parser('gc', help='Remove unprotected packages')
+    gcP = gcP.add_argument('-y', help='Do not prompt for confirmation.'
+            , action='store_true', dest='autoconfirm')
 
     args = p.parse_args(argv[1:])
     L = logging.getLogger(__name__)
@@ -382,6 +391,9 @@ def lpkgm_run_from_cmd_args(argv):
         if not pkgSettings:
             L.critical(f'Package "{args.pkgName}" is not known.')
             return False
+    protectionRules = None
+    if args.mode in ('uninstall', 'remove', 'delete', 'rm', 'gc'):
+        protectionRules = build_protection_rules()
     # check access to packages dir
     gSettings['packages-registry-dir'] = os.path.normpath(gSettings['packages-registry-dir'])
     if args.mode in ('install', 'remove') \
@@ -430,6 +442,8 @@ def lpkgm_run_from_cmd_args(argv):
                             , depGraph=depGraph )
                 else:
                     return show_tree(sys.stdout, args.pkgName, args.pkgVersion, depGraph)
+            elif args.mode in ('gc',):
+                raise NotImplementedError('TODO: clean orphaned pkgs')
             else:
                 L.critical(f'Error: unknown sub-command: "{args.mode}".')
                 assert False

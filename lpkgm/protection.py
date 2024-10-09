@@ -1,5 +1,8 @@
+import io, datetime, logging
+
+from collections import defaultdict
+
 import lpkgm.ordered_versions
-import io
 
 class ProtectionRule(object):
     """
@@ -68,7 +71,7 @@ class KeepLatestProtectionRule(ProtectionRule):
         super().__init__(label)
         self._limit = latestLimit
         self._order = lpkgm.ordered_versions.VersionsOrder(
-                attributesOrder=attributesOrder,
+                attributesOrder=attrsOrder,
                 ortogonalBy=flavourFrom
                 )
         self._sorted = {}
@@ -105,8 +108,14 @@ def build_protection_rules():
     Note, that protection rules does not take into account dependency tree
     propagation.
     """
+    from lpkgm.utils import packages  # import here to avoid circular import
+    from lpkgm.settings import gSettings
+
+    L = logging.getLogger(__name__)
+
     packagesByName = defaultdict(list)  # for protection rules
     for pkgData, pkgFilePath in packages():
+        pkgName, pkgVer = pkgData['package'], pkgData['version']['fullVersion']
         # append packages dict
         packagesByName[pkgName].append(
                 ( pkgData['version']['fullVersion']
@@ -141,11 +150,11 @@ def protecting_rules_report(items, indent=0):
     f = io.StringIO("")
 
     for peName, peVer, peRule, peSub in items:
-        f.write('    '*indent + f'"{peName}-{peVer}"')
+        f.write('    '*indent + f'"{peName}-{peVer}" depends on the subject')
         if peRule:
-            f.write(f' is protected by "{peRule}"')
+            f.write(f', is protected by "{peRule}"')
         if peSub:
-            f.write((' and' if peRule else '') + ' provides packages:\n')
+            f.write(' and provides packages:\n')
             f.write(protecting_rules_report(peSub, indent=indent+1))
         else:
             f.write('\n')
