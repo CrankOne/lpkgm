@@ -49,8 +49,7 @@ class TestDepTriplet(unittest.TestCase):
                                    , ('B', '1'): 123
                                    , ('C', '1'): 123 }  # mock
 
-    def test_protection_triplet(self):
-        # check 1st
+    def test_dependency_propagation(self):
         protectC = {'C': [MockProtectionRule()]}
         # test plain and recursive cases of 1st for C:
         for isRecursive in (False, True):
@@ -76,3 +75,28 @@ class TestDepTriplet(unittest.TestCase):
         aRules = self.depGraph.get_protecting_rules('A', '1', 0
                     , protectionRules=protectC, recursive=False)
         self.assertFalse(aRules)
+
+    def test_dependency_isolation(self):
+        protectC = {'A': [MockProtectionRule()]}
+        # test plain and recursive cases of 1st for C:
+        for isRecursive in (False, True):
+            cRules = self.depGraph.get_protecting_rules('C', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertFalse(cRules)
+            bRules = self.depGraph.get_protecting_rules('B', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertFalse(bRules)
+            # test that A got protected by itself
+            aRules = self.depGraph.get_protecting_rules('A', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertTrue(aRules)  # make sure it casts to True
+            self.assertEqual(aRules, ('A', '1', ['mock'], []))
