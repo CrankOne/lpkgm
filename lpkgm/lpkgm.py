@@ -9,7 +9,7 @@ import gitlab
 #import networkx as nx  # XXX
 
 from lpkgm.settings import read_settings_file, gSettings
-from lpkgm.dependencies import PkgGraph
+from lpkgm.dependencies import PkgGraph, show_tree, remove_unprotected_packages
 from lpkgm.utils import packages, pkg_manifest_file_path, stats_summary, \
         get_package_manifests, sizeof_fmt
 from lpkgm.installer import Installer
@@ -250,12 +250,6 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
         uninstall_package(pkgName, pkgDatum, depGraph=depGraph)
     return True
 
-def show_tree(outStream, pkgName, pkgVerStr, depGraph):
-    # TODO: if pkgName and/or pkgVer is given, retrieve subtree
-    nx.write_network_text(depGraph.g)
-    #print(dg.in_edges(('xz', '5.6.2-opt')))  # input edges means that this package is a dep for smt other
-    pass
-
 def show(outStream, pkgName, pkgVer, format_='ascii', depGraph=None):
     L = logging.getLogger(__name__)
     pTable = None
@@ -435,6 +429,7 @@ def lpkgm_run_from_cmd_args(argv):
                         , depGraph=depGraph
                         , autoConfirm=args.autoConfirm
                         , keep=args.keep
+                        , protectionRules=protectionRules
                         )
             elif args.mode in ('show', 'inspect', 'list'):
                 if not args.tree:
@@ -443,7 +438,7 @@ def lpkgm_run_from_cmd_args(argv):
                 else:
                     return show_tree(sys.stdout, args.pkgName, args.pkgVersion, depGraph)
             elif args.mode in ('gc',):
-                raise NotImplementedError('TODO: clean orphaned pkgs')
+                return remove_unprotected_packages(depGraph, protectionRules)
             else:
                 L.critical(f'Error: unknown sub-command: "{args.mode}".')
                 assert False

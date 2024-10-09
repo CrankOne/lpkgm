@@ -174,3 +174,20 @@ class PkgGraph(object):
         else:
             L.debug('Dep.graph did not change.')
 
+def show_tree(outStream, pkgName, pkgVerStr, depGraph):
+    # TODO: if pkgName and/or pkgVer is given, retrieve subtree
+    nx.write_network_text(depGraph.g)
+    #print(dg.in_edges(('xz', '5.6.2-opt')))  # input edges means that this package is a dep for smt other
+
+
+def remove_unprotected_packages(depGraph, protectionRules):
+    """
+    Figures out packages that one can safely remove:
+        1. Package is not protected one
+        2. Package does not provide (is not dependency of) any protected package
+    One has to be aware of order of these packages -- dependee should be removed
+    first.
+    """
+    raise NotImplementedError('TODO: gc')
+    # look for isolated sub-graphs
+    pass
