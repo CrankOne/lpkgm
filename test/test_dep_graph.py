@@ -38,8 +38,9 @@ class TestDepTriplet(unittest.TestCase):
         #
         # Cases to be tested:
         #
-        #   1. if C is protected, A and B are also protected
-        #   2. if only A is protected, C and B are not protected
+        #   1. if C is protected, A and B are also protected (protection propagated)
+        #   2. if only A/B is protected, C and B/A are not protected (protection isolated)
+        #   3. if A and B are protected, C is not
         self.depGraph = lpkgm.dependencies.PkgGraph(forceRebuild=False, filePath=f'/tmp/xxx.{__name__}.gpickle')
         self.depGraph.add( ('C', '1'), ('A', '1') )  # C depends on A
         self.assertEqual( self.depGraph.depends_on('C', '1'), [('A', '1')] )
@@ -76,7 +77,7 @@ class TestDepTriplet(unittest.TestCase):
                     , protectionRules=protectC, recursive=False)
         self.assertFalse(aRules)
 
-    def test_dependency_isolation(self):
+    def test_dependency_isolation_single(self):
         protectC = {'A': [MockProtectionRule()]}
         # test plain and recursive cases of 1st for C:
         for isRecursive in (False, True):
@@ -100,3 +101,31 @@ class TestDepTriplet(unittest.TestCase):
                     )
             self.assertTrue(aRules)  # make sure it casts to True
             self.assertEqual(aRules, ('A', '1', ['mock'], []))
+
+    def test_dependency_isolation_mult(self):
+        protectC = {'A': [MockProtectionRule('mock-a')], 'B': [MockProtectionRule('mock-b')]}
+        # test plain and recursive cases of 1st for C:
+        for isRecursive in (False, True):
+            cRules = self.depGraph.get_protecting_rules('C', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertFalse(cRules)
+            # test that A and B got protected by themselves
+            aRules = self.depGraph.get_protecting_rules('A', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertTrue(aRules)  # make sure it casts to True
+            self.assertEqual(aRules, ('A', '1', ['mock-a'], []))
+
+            bRules = self.depGraph.get_protecting_rules('B', '1', 0
+                    , protectionRules=protectC
+                    , recursive=isRecursive
+                    , installedTimesCache=self.installedTimesCache
+                    )
+            self.assertTrue(bRules)
+            self.assertEqual(bRules, ('B', '1', ['mock-b'], []))
+            
