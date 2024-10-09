@@ -149,10 +149,10 @@ def protecting_rules_report(items, indent=0):
     returnValue = False
     f = io.StringIO("")
 
-    for peName, peVer, peRule, peSub in items:
-        f.write('    '*indent + f'"{peName}-{peVer}" depends on the subject')
-        if peRule:
-            f.write(f', is protected by "{peRule}"')
+    for peName, peVer, peRules, peSub in items:
+        f.write('    '*indent + f'"{peName}/{peVer}" depends on the subject')
+        if peRules:
+            f.write(f', is protected by rules: {", ".join(peRules)}')
         if peSub:
             f.write(' and provides packages:\n')
             f.write(protecting_rules_report(peSub, indent=indent+1))
