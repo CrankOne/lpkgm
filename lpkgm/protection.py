@@ -118,7 +118,9 @@ class KeepLatestProtectionRule(ProtectionRule):
         L = logging.getLogger(__name__)
         assert type(pkgVersion) is str
         if pkgVersion not in self._versionsCache.keys():
-            raise KeyError(f'{self._pkgName}/{pkgVersion} is not known.')
+            L.warning(f'Protection rule "{self.label}": package version {self._pkgName}/{pkgVersion}'
+                    + ' is not cached; will conservatively mark it as "protected".')
+            return True
         fl, ver = self._order.canonic_version_tuple(self._versionsCache[pkgVersion])
         # based on falvour, get list of sorted versions, truncated by limit
         linVersion = self._sorted[fl]

@@ -110,7 +110,7 @@ def install_package(pkgName, pkgVerStr, pkgSettings, use=None, modulescript=None
             + f' installed ({stats_summary(stats)})')
     return True
 
-def uninstall_package(pkgName, pkgData, depGraph=None):
+def _uninstall_package(pkgName, pkgData, depGraph=None):
     L = logging.getLogger(__name__)
     pkgVerStr = pkgData['version']['fullVersion']
     L.info(f'Removing package "{pkgName}" of version "{pkgVerStr}"'
@@ -166,8 +166,9 @@ def uninstall_package(pkgName, pkgData, depGraph=None):
     os.remove(pkg_manifest_file_path(pkgName, pkgVerStr))
     if depGraph:
         try:
-            for dep in pkgData['dependencies']:
-                depGraph.remove((pkgName, pkgVerStr), dep)
+            # TODO: shaky... why?
+            #for dep in pkgData['dependencies']:
+            #    depGraph.remove((pkgName, pkgVerStr), dep)
             depGraph.remove_pkg(pkgName, pkgVerStr)
         except Exception as e:
             L.error('Failed to update dependency graph. Run lpkgm next time with --dep-recache'
@@ -235,7 +236,7 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
         elif len(pkgDatum) > 1:
             raise RuntimeError(f'Multiple package manifests are found for {pkgName}/{pkgVerStr}')
         pkgDatum = pkgDatum[0]
-        rmQueue.append(pkgDatum)
+        rmQueue.append((pkgName, pkgDatum))
         pTable.add_row([pkgName, pkgVerStr, stats_summary(pkgDatum["stats"])])
         # check we really can delete the package not breaking any dependant packages
         #provides = depGraph.dependency_of(pkgName, pkgVerStr)
@@ -278,7 +279,7 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
     L.info('Deleting package(s)...') 
     for pkgName, pkgDatum in rmQueue:
         pkgVerStr = pkgDatum['version']['fullVersion']
-        uninstall_package(pkgName, pkgDatum, depGraph=depGraph)
+        _uninstall_package(pkgName, pkgDatum, depGraph=depGraph)
     return True
 
 def show( outStream, pkgName, pkgVer, format_='ascii', depGraph=None
