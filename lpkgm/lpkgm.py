@@ -219,8 +219,8 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
             protectedBy = depGraph.get_protecting_rules( pkgName
                     , pkgDatum['version'], datetime.fromisoformat(pkgDatum['installedAt'])
                     , protectionRules=protectionRules)
-            if protectedBy and (protectedBy[0][3] or protectedBy[0][4]):
-                # ^^^ 1 - name, 2 - ver, 3 - rule label, 4 - provided pkgs
+            if protectedBy and (protectedBy[0][2] or protectedBy[0][3]):
+                # ^^^ 0 - name, 1 - ver, 2 - rule label, 3 - provided pkgs
                 #     so "protectedBy[3] or protectedBy[4]" is equivalent
                 #     to "protected by rule or provides pkg(s)"
                 blocks.append(protecting_rules_report(protectedBy))
