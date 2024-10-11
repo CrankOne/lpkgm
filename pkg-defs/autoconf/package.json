@@ -10,5 +10,6 @@
         "installed-files-list": ["autoconf.src/installed-files.txt"]
       }
     }
-  ]
+  ],
+  "protection-rules": [{"label": "system", "type": "always"}]
 }
