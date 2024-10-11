@@ -1,4 +1,4 @@
-import os, logging, pickle, datetime
+import os, logging, pickle, datetime, copy
 
 from collections import defaultdict
 
@@ -65,6 +65,16 @@ class PkgGraph(object):
             #self.save()
             self._dirty = True
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        L = logging.getLogger(__name__)
+        if self._dirty:
+            self.save()
+        else:
+            L.debug('Dep.graph did not change.')
+
     def save(self):
         L = logging.getLogger(__name__)
         L.debug(f'Dependencies graph cached at {self._filePath}')
@@ -128,6 +138,7 @@ class PkgGraph(object):
         denoting reason of this package being protected from removal.
         First returned package name is always eponymous to the argument
         (`pkgName`), others ...
+        Used mainly to generate output usable for report printing.
         """
         L = logging.getLogger(__name__)
         r = tuple()
@@ -179,30 +190,98 @@ class PkgGraph(object):
                 )
         return r
 
-    def __enter__(self):
-        return self
+    def isolated_subgraphs(self):
+        #return nx.weakly_connected_component_subgraphs(self.g)  # no longer maintained starting from >~2.8
+        for nodesSet in nx.weakly_connected_components(self.g):
+            yield self.g.subgraph(list(nodesSet))
 
-    def __exit__(self, type, value, traceback):
-        L = logging.getLogger(__name__)
-        if self._dirty:
-            self.save()
-        else:
-            L.debug('Dep.graph did not change.')
+    def unprotected_items(self):
+        """
+        Returns set of items which are:
+            1. not protected by any rule by themselves
+            2. do not provide any protected dependee
+        Useful for "garbage collection" (deleting orphaned unprotected packages
+        and their unprotected dependencies).
+        """
+        for subGraph in self.isolated_subgraphs():
+            # within isolated sub-graph, apply a recursive algorithm to collect
+            # unprotected nodes
+            pass
+
+    def get_protected_rules_by_pkg(self, protectionRules, installedTimesCache):
+        """
+        Returns dict of nodes and list of its protecting rules. Nodes not covered
+        by protection rule(s) will not be added to the resulting
+        dictionary (important!)
+        """
+        def _get_protection_rules(pkgName, pkgVer, pkgInstallTime, allRules):
+            r = set()
+            if pkgName not in allRules.keys(): return r
+            for rule in allRules[pkgName]:
+                if not rule(pkgVer, pkgInstallTime): continue
+                r.add(rule.label)
+            return list(sorted(r))
+        r = dict()
+        for node in self.g.nodes:
+            thisProtectingRules = _get_protection_rules(*node
+                    , installedTimesCache.get(node[0], None)
+                    , protectionRules
+                    )
+            if not thisProtectingRules: continue
+            r[node] = thisProtectingRules
+        return r
+
+    def get_protected_pkgs(self, protectionRules, installedTimesCache):
+        """
+        Returns set of all (directly or indirectly) protected nodes
+        """
+        
+        # build set of is-protected pkgs (ones directly protected by at least one
+        # of the rule)
+        protected1st = set(self.get_protected_rules_by_pkg(protectionRules, installedTimesCache).keys())
+        protectedAll = copy.copy(protected1st)
+        for protected1stPkg in protected1st:
+            # get all dependencies of "directly protected" package and add it to
+            # the protected ones (note, that `descendants returns ALL the
+            # descendants of arbitrary depth, not only the immediate ones)
+            for desc in nx.descendants(self.g, protected1stPkg):
+                protectedAll.add(desc)
+        return protectedAll
+
+    def get_unprotected_pkgs(self, protectionRules, installedTimesCache):
+        allNodes = set(self.g.nodes)
+        return allNodes - self.get_protected_pkgs(protectionRules, installedTimesCache)
+
+    def sort_for_removal(self, pkgs_):
+        """
+        Sorts given iterable `pkgs` for removal in a way that dependee always
+        go before its dependency -- so that dependencies tree is kept
+        consistent upon failures.
+        """
+        pkgs = set(pkgs_)
+        tiers = []
+        while pkgs:
+            tgt = None
+            for subGraphLarge in self.isolated_subgraphs():
+                subPkgs = set(subGraphLarge.nodes) & pkgs
+                if subPkgs:
+                    tgt = subPkgs
+                    break
+            if not tgt:
+                print(pkgs)  # XXX
+                raise RuntimeError('No sub-graph found for any node of:'
+                        + ', '.join(f'{nm}/{ver}' for (nm, ver) in pkgs) )  # TODO: details
+            # got match with current subgraph and can remove some packages;
+            pkgs -= tgt  # pull the "removed" ones
+            # get sub-graph of to-remove nodes
+            subGraphToRemove = self.g.subgraph(list(tgt))
+            # put new tier as depth-first post-order
+            tiers.append(list(nx.dfs_postorder_nodes(subGraphToRemove)))
+        return tiers
+
 
 def show_tree(outStream, pkgName, pkgVerStr, depGraph):
     # TODO: if pkgName and/or pkgVer is given, retrieve subtree
     nx.write_network_text(depGraph.g)
     #print(dg.in_edges(('xz', '5.6.2-opt')))  # input edges means that this package is a dep for smt other
 
-
-def remove_unprotected_packages(depGraph, protectionRules):
-    """
-    Figures out packages that one can safely remove:
-        1. Package is not protected one
-        2. Package does not provide (is not dependency of) any protected package
-    One has to be aware of order of these packages -- dependee should be removed
-    first.
-    """
-    raise NotImplementedError('TODO: gc')
-    # look for isolated sub-graphs
-    pass
