@@ -30,7 +30,7 @@ def attr_item_to_getter(attrItem, default_cnv=convert_version_subnum):
 
 class VersionsOrder(object):
     """
-    Based by attributes order and list of ortogonal version attributes, builds
+    Based on attributes order and list of ortogonal version attributes, builds
     index of ordered versions.
     """
     defaultAttrsOrder=( ('major',  'convert_version_subnum')
@@ -56,8 +56,10 @@ class VersionsOrder(object):
 
     def canonic_version_tuple(self, pkgVer_, installTime=None):
         """
-        Converts version object into "canonic version tuple". Returns (<flavour:tuple>, <version:tuple>)
+        Converts version object into "canonic version tuple".
+        Returns (<flavour:tuple>, <version:tuple>)
         """
+        assert type(pkgVer_) is dict
         # append with `_installTime' if (most probably) package version
         # was not artificially annotated with it
         pkgVer = copy.copy(pkgVer_)
@@ -71,12 +73,16 @@ class VersionsOrder(object):
     def flavourKeys(self):
         return list(c for c, _ in self._ortogonalBy) if self._ortogonalBy else [None,]
 
-    def __call__(self, pkgVersionsAndDate):
+    @property
+    def attrKeys(self):
+        return list(c for c, _ in self._attrOrder) if self._attrOrder else [None,]
+
+    def __call__(self, pkgVersions):
         # build list of items: {(attrs...): pkgVerDict}
         versionsByOrtogonalAttr = defaultdict(dict)
-        for pkgVer_, installTime in pkgVersionsAndDate:
-            ortoKeys, verKey = self.canonic_version_tuple(pkgVer_, installTime)
-            versionsByOrtogonalAttr[ortoKeys][verKey] = (pkgVer_, installTime)
+        for pkgVer_ in pkgVersions:
+            ortoKeys, verKey = self.canonic_version_tuple(pkgVer_)
+            versionsByOrtogonalAttr[ortoKeys][verKey] = pkgVer_
         # Use tuple comparison to sort resulting "keys",
         # see "Lexicographical comparison" in
         #       https://docs.python.org/3/reference/expressions.html#value-comparisons

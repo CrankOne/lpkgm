@@ -148,7 +148,9 @@ def packages(pkgNamePattern=None, pkgVerPattern=None):
     Generator function yielding all packages known to registry.
     """
     L = logging.getLogger(__name__)
-    for pkgFilePath in glob.glob(gSettings['packages-registry-dir'] + '/*/*.json'):
+    if not pkgNamePattern: pkgNamePattern = '*'
+    if not pkgVerPattern:  pkgVerPattern  = '*'
+    for pkgFilePath in glob.glob(gSettings['packages-registry-dir'] + f'/{pkgNamePattern}/{pkgVerPattern}.json'):
         with open(pkgFilePath, 'r') as pkgFile:
             pkgData = json.load(pkgFile)
         if not ('package' in pkgData and 'version' in pkgData):

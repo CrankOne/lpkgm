@@ -1,6 +1,7 @@
 import os, logging, pickle, datetime, copy
 
 from collections import defaultdict
+from fnmatch import fnmatch
 
 from lpkgm.utils import packages
 from lpkgm.settings import gSettings
@@ -127,10 +128,9 @@ class PkgGraph(object):
         self.g.add_node((pkgName, pkgVer))
         self._dirty = True
 
-    def get_protecting_rules(self, pkgName, pkgVersion, installTime
+    def get_protecting_rules(self, pkgName, pkgVersion
             , protectionRules=None
             , recursive=True
-            , installedTimesCache=None
             ):
         """
         Returns list of 3-element tuples:
@@ -140,16 +140,18 @@ class PkgGraph(object):
         (`pkgName`), others ...
         Used mainly to generate output usable for report printing.
         """
+        if type(pkgVersion) is dict:
+            pkgVersion = pkgVersion['fullVersion']
         L = logging.getLogger(__name__)
         r = tuple()
         # if no protection rule covers this package
         protectedByRules = []
         for rule in protectionRules.get(pkgName, []):
-            if rule(pkgVersion, installTime):
+            if rule(pkgVersion):
                 protectedByRules.append(rule.label)
         if protectedByRules:
             r = ( pkgName
-               , pkgVersion['fullVersion'] if type(pkgVersion) is dict else pkgVersion
+               , pkgVersion
                , protectedByRules
                , []
                )
@@ -158,33 +160,19 @@ class PkgGraph(object):
         # Get all the packages depending on given (packages this one provides),
         # append the rules list, if need
         rr = []
-        for dpName, dpVer in self.dependency_of(pkgName
-                , pkgVersion['fullVersion'] if type(pkgVersion) is dict else pkgVersion):
+        for dpName, dpVer in self.dependency_of(pkgName, pkgVersion):
             # to get installed time of depending pkgs as we have to load
             # full manifest :(
             assert type(dpVer) is str  # only stringified versions must be stored in graph
-            dpInstalledAt = None
-            if installedTimesCache:
-                dpInstalledAt = installedTimesCache[(dpName, dpVer)]
-            if not dpInstalledAt:
-                L.debug(f'Loading installation package manifest for {dpName}/{dpVer}'
-                        + ' to get installation time')
-                manifest = get_package_manifests(dpName, dpVer)
-                if manifest and len(manifest) == 1:
-                    dpInstalledAt = manifest[0]['installedAt']
-            if not dpInstalledAt:
-                raise RuntimeError('Unknown installation'
-                        + f' time of package {dpName}/{dpVer}')
-            dpRules = self.get_protecting_rules(dpName, dpVer, dpInstalledAt
+            dpRules = self.get_protecting_rules(dpName, dpVer
                     , protectionRules=protectionRules
                     , recursive=True
-                    , installedTimesCache=installedTimesCache
                     )
             if dpRules:
                 rr.append(dpRules)
         if rr:
             r = ( pkgName
-                , pkgVersion['fullVersion'] if type(pkgVersion) is dict else pkgVersion
+                , pkgVersion
                 , protectedByRules
                 , rr
                 )
@@ -208,37 +196,36 @@ class PkgGraph(object):
             # unprotected nodes
             pass
 
-    def get_protected_rules_by_pkg(self, protectionRules, installedTimesCache):
+    def get_protected_rules_by_pkg(self, protectionRules):
         """
         Returns dict of nodes and list of its protecting rules. Nodes not covered
         by protection rule(s) will not be added to the resulting
         dictionary (important!)
         """
-        def _get_protection_rules(pkgName, pkgVer, pkgInstallTime, allRules):
+        def _get_protection_rules(pkgName, pkgVer, allRules):
             r = set()
             if pkgName not in allRules.keys(): return r
             for rule in allRules[pkgName]:
-                if not rule(pkgVer, pkgInstallTime): continue
+                if not rule(pkgVer): continue
                 r.add(rule.label)
             return list(sorted(r))
         r = dict()
         for node in self.g.nodes:
             thisProtectingRules = _get_protection_rules(*node
-                    , installedTimesCache.get(node[0], None)
                     , protectionRules
                     )
             if not thisProtectingRules: continue
             r[node] = thisProtectingRules
         return r
 
-    def get_protected_pkgs(self, protectionRules, installedTimesCache):
+    def get_protected_pkgs(self, protectionRules):
         """
         Returns set of all (directly or indirectly) protected nodes
         """
         
         # build set of is-protected pkgs (ones directly protected by at least one
         # of the rule)
-        protected1st = set(self.get_protected_rules_by_pkg(protectionRules, installedTimesCache).keys())
+        protected1st = set(self.get_protected_rules_by_pkg(protectionRules).keys())
         protectedAll = copy.copy(protected1st)
         for protected1stPkg in protected1st:
             # get all dependencies of "directly protected" package and add it to
@@ -248,9 +235,33 @@ class PkgGraph(object):
                 protectedAll.add(desc)
         return protectedAll
 
-    def get_unprotected_pkgs(self, protectionRules, installedTimesCache):
+    def get_unprotected_pkgs(self, protectionRules):
         allNodes = set(self.g.nodes)
-        return allNodes - self.get_protected_pkgs(protectionRules, installedTimesCache)
+        return allNodes - self.get_protected_pkgs(protectionRules)
+
+    def get_matching_pkgs(self, pkgNamePat, pkgVerPat='*', protectionRules=None):
+        L = logging.getLogger(__name__)
+        if not protectionRules: protectionRules={}
+        r = []
+        for node in self.g.nodes:
+            if not fnmatch(node[0], pkgNamePat):
+                L.debug(f'{node[0]}/{node[1]} does not match pkg name "{pkgNamePat}"')
+                continue  # doesn't match selection by name
+            if pkgVerPat and not fnmatch(node[1], pkgVerPat):
+                L.debug(f'{node[0]}/{node[1]} does not match version "{pkgVerPat}"')
+                continue  # doesn't match sel by ver
+            if protectionRules:
+                protected = False
+                if node[0] in protectionRules.keys():
+                    for rule in protectionRules[node[0]]:
+                        if not rule(node[1]): continue
+                        protected = True  # got protection by at least one of the rules
+                        L.debug(f'{node[0]}/{node[1]} is protected by rule "{rule.label}"')
+                        break
+                if protected: continue  # protected one
+            L.debug(f'{node[0]}/{node[1]} match')
+            r.append(node)
+        return r
 
     def sort_for_removal(self, pkgs_):
         """
@@ -268,7 +279,6 @@ class PkgGraph(object):
                     tgt = subPkgs
                     break
             if not tgt:
-                print(pkgs)  # XXX
                 raise RuntimeError('No sub-graph found for any node of:'
                         + ', '.join(f'{nm}/{ver}' for (nm, ver) in pkgs) )  # TODO: details
             # got match with current subgraph and can remove some packages;
