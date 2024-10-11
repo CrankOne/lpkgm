@@ -176,25 +176,16 @@ def uninstall_package(pkgName, pkgData, depGraph=None):
     L.info(f'"{pkgName}" of version "{pkgVerStr}" removed.')
     return True
 
-def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
-        , protectionRules=None
-        , autoConfirm=False, depGraph=None, keep=None):
-    L = logging.getLogger(__name__)
-    rmQueue = []
-    if keep is None: keep=[]
-    for pkgName, pkgSettings in pkgs:
-        pkgData = get_package_manifests(pkgName, pkgVerStrPat, exclude=list(k.split('/') for k in keep))
-        if not pkgData:
-            if pkgNamePat == pkgName:
-                raise RuntimeError(f'Package is not installed: {pkgName} of'
-                    + f' version "{pkgVerStrPat}" (no install manifest file exist)')
-            else:
-                raise RuntimeError(f'Package is not installed: {pkgName} (matching "{pkgNamePat}") of'
-                    + f' version "{pkgVerStrPat}" (no install manifest file exist)')
-        for pkgDatum in pkgData:
-            rmQueue.append((pkgName, pkgDatum))
+def _uninstall_packages(rmQueue, protectionRules, autoConfirm, depGraph):
     assert rmQueue
-
+    rmTiers = depGraph.sort_for_removal(toRemove)
+    #for nTier, tier in enumerate(rmTiers):
+    #    L.info('Cleaning up')
+    #    pass
+    rmQueue_ = []
+    for tier in rmTiers:
+        rmQueue_ += tier
+    rmQueue = rmQueue_
     rmInfoMsg = f'Packages selected for deletion ({len(rmQueue)}):'
     pTable = prettytable.PrettyTable()
     pTable.field_names = ['Package', 'Version', 'Stats']  # TODO: dependency of?
@@ -249,6 +240,42 @@ def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
         pkgVerStr = pkgDatum['version']['fullVersion']
         uninstall_package(pkgName, pkgDatum, depGraph=depGraph)
     return True
+
+def uninstall_packages( pkgNamePat, pkgVerStrPat, pkgs
+        , protectionRules=None
+        , autoConfirm=False, depGraph=None, keep=None):
+    L = logging.getLogger(__name__)
+    rmQueue = []
+    if keep is None: keep=[]
+    for pkgName, pkgSettings in pkgs:
+        pkgData = get_package_manifests(pkgName, pkgVerStrPat, exclude=list(k.split('/') for k in keep))
+        if not pkgData:
+            if pkgNamePat == pkgName:
+                raise RuntimeError(f'Package is not installed: {pkgName} of'
+                    + f' version "{pkgVerStrPat}" (no install manifest file exist)')
+            else:
+                raise RuntimeError(f'Package is not installed: {pkgName} (matching "{pkgNamePat}") of'
+                    + f' version "{pkgVerStrPat}" (no install manifest file exist)')
+        for pkgDatum in pkgData:
+            rmQueue.append((pkgName, pkgDatum))
+    return _uninstall_packages(rmQueue, protectionRules, autoConfirm, depGraph)
+
+def remove_unprotected_packages(depGraph, protectionRules, installedTimesCache
+        , autoConfirm=False):
+    """
+    Figures out packages that one can safely remove:
+        1. Package is not protected by any of the package protection rule(s).
+        2. Package does not provide (is not dependency of) any protected
+           package.
+    One has to be aware of order of these packages -- dependee should be
+    removed first.
+    """
+    # get all packages not marked as protected
+    toRemove = depGraph.get_unprotected_pkgs(protectionRules, installedTimesCache)
+    if not toRemove:
+        L.info('No unprotected packages in tree.')
+        return
+    return _uninstall_packages(toRemove, protectionRules, autoConfirm, depGraph)
 
 def show(outStream, pkgName, pkgVer, format_='ascii', depGraph=None):
     L = logging.getLogger(__name__)

@@ -149,10 +149,10 @@ def protecting_rules_report(items, indent=0):
     returnValue = False
     f = io.StringIO("")
 
-    for peName, peVer, peRule, peSub in items:
-        f.write('    '*indent + f'"{peName}-{peVer}" depends on the subject')
-        if peRule:
-            f.write(f', is protected by "{peRule}"')
+    for peName, peVer, peRules, peSub in items:
+        f.write('    '*indent + f'"{peName}/{peVer}" depends on the subject')
+        if peRules:
+            f.write(f', is protected by rules: {", ".join(peRules)}')
         if peSub:
             f.write(' and provides packages:\n')
             f.write(protecting_rules_report(peSub, indent=indent+1))
@@ -160,21 +160,22 @@ def protecting_rules_report(items, indent=0):
             f.write('\n')
     return f.getvalue()
 
-tst = [
-        ['a', '0.0.1', 'rule-1', []],
-        ['b', '1.0', None, [
-                ['c', '1.1', None, []],
-                ['d', '023', None, []]
-            ]],
-        ['e', '0.0.452', 'rule-2', [
-                ['f', '10.45', None, [
-                        ['g', 'Nov-23', 'rule-3', []],
-                        ['h', '1.0', None, []]
-                    ]],
-                ['i', '1.0', None, []]
-            ]]
-    ]
-
-if __name__ == "__main__":
-    print(protecting_rules_report(tst))
+# Report printing example:
+#tst = [
+#        ['a', '0.0.1', 'rule-1', []],
+#        ['b', '1.0', None, [
+#                ['c', '1.1', None, []],
+#                ['d', '023', None, []]
+#            ]],
+#        ['e', '0.0.452', 'rule-2', [
+#                ['f', '10.45', None, [
+#                        ['g', 'Nov-23', 'rule-3', []],
+#                        ['h', '1.0', None, []]
+#                    ]],
+#                ['i', '1.0', None, []]
+#            ]]
+#    ]
+#
+#if __name__ == "__main__":
+#    print(protecting_rules_report(tst))
 
