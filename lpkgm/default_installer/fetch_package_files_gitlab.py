@@ -6,6 +6,10 @@ import gitlab
 from lpkgm.settings import gSettings
 from lpkgm.utils import get_gitlab_project_token, download_file_http
 
+# Note: at some point datetime.fromisoformat() stopped to work with timestamp
+#       provided by GitLab API, so we moved to hardcoded format here.
+gTSFmtISO="%Y-%m-%dT%H:%M:%S.%f%z"
+
 def run(self, pkgName, pkgVer
         , server=None
         , projectID=None
@@ -26,9 +30,9 @@ def run(self, pkgName, pkgVer
     if publishedAtTimeInterval is None:
         publishedAtTimeInterval = [None, None]
     if publishedAtTimeInterval[0] and type(publishedAtTimeInterval[0]) is str:
-        publishedAtTimeInterval[0] = datetime.fromisoformat(publishedAtTimeInterval[0])
+        publishedAtTimeInterval[0] = datetime.strptime(publishedAtTimeInterval[0], gTSFmtISO)
     if publishedAtTimeInterval[1] and type(publishedAtTimeInterval[1]) is str:
-        publishedAtTimeInterval[1] = datetime.fromisoformat(publishedAtTimeInterval[1])
+        publishedAtTimeInterval[1] = datetime.strptime(publishedAtTimeInterval[1], gTSFmtISO)
     # authenticate GitLab API and get files matching patterns to pick up
     assert projectID is not None
     token = get_gitlab_project_token(projectID, server=server)
@@ -112,7 +116,7 @@ def run(self, pkgName, pkgVer
     filesToFetch = {}
     for fileDefName, thisFiles in selectedFiles.items():
         sortedByCreation \
-            = sorted(thisFiles, key=lambda f: datetime.fromisoformat(f[0].created_at))
+            = sorted(thisFiles, key=lambda f: datetime.strptime(f[0].created_at, gTSFmtISO))
         if publishedAtTimeInterval[0]:
             sortedByCreation = filter(lambda f: f[0].created_at > publishedAtTimeInterval[0], sortedByCreation)
         if publishedAtTimeInterval[1]:
