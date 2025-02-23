@@ -407,7 +407,7 @@ def lpkgm_run_from_cmd_args(argv):
             , action='store_true')
     # sub-parsers (subcommands)
     subparsers = p.add_subparsers(help='Action options', dest='mode')
-    installP = subparsers.add_parser(gInstallCmdAliases[1], help='Install package'
+    installP = subparsers.add_parser(gInstallCmdAliases[0], help='Install package'
             , aliases=gInstallCmdAliases[1:])
     installP.add_argument('pkgName', help='Name of package to install')
     installP.add_argument('pkgVersion', help='Version of package to install')
