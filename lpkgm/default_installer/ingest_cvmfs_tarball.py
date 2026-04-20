@@ -39,7 +39,7 @@ def run( self, pkgName, pkgVer
     elif type(deleteDir) is str:
         deleteDir = [deleteDir]
     assert type(deleteDir) in (tuple, list)
-    for dd in deleteDir
+    for dd in deleteDir:
         cmd_ += ['-d', dd]
     # handle create dir
     if createDir:
@@ -47,7 +47,7 @@ def run( self, pkgName, pkgVer
     elif type(createDir) is str:
         createDir = [createDir]
     assert type(createDir) in (tuple, list)
-    for dd in createDir
+    for dd in createDir:
         cmd_ += ['-c', dd]
     # handle archive
     assert tarFile
