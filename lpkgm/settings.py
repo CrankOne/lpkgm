@@ -125,7 +125,12 @@ def read_settings_file(settingsFilePath, definitions=None):
     while True:
         hadChange = False
         for k, v in gSettings['definitions'].items():
-            newVal = v.format(**gSettings['definitions'])
+            try:
+                newVal = v.format(**gSettings['definitions'])
+            except:
+                L.error(str(e) + '; list of available definitions: '
+                        + ', '.join('"%s"="%s"'%(k, v) for k,v in gSettings['definitions'].items()) )
+                raise
             if newVal != v:
                 adChange = True
             gSettings['definitions'][k] = newVal
