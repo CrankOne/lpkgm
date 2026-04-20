@@ -19,7 +19,7 @@ class Installer(object):
     installation pipeline (a singular purpose of this class).
 
     Gets constructed based on package manifest and evolve dynamically-composed
-    installation pipeline. The pcakage manifest should provide a sequence of
+    installation pipeline. The package manifest should provide a sequence of
     calls of methods listed below in section "methods".
     """
     def __init__(self, items, modulescript=None, pkgDefs=None):
