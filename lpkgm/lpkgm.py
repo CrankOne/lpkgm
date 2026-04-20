@@ -384,8 +384,11 @@ def show( outStream, pkgName, pkgVer, format_='ascii', depGraph=None
         assert pkgName and pkgVer
         pkgData = get_package_manifests(pkgName, pkgVer)
         # TODO: ascii pretty print
-        outStream.write(json.dumps(pkgData, sort_keys=True, indent=2) + '\n')
-        return True
+        if pkgData:
+            outStream.write(json.dumps(pkgData, sort_keys=True, indent=2) + '\n')
+            return True
+        else:
+            return False
 
 #                                                                  ___________
 # _______________________________________________________________/ Entry point
